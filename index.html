@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Engagement Photo Booth</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        text-align: center;
+        margin: 20px;
+      }
+      video,
+      canvas {
+        border: 2px solid #ccc;
+        border-radius: 10px;
+        margin-top: 10px;
+      }
+      video {
+        width: 480px;
+        height: 360px;
+      }
+      canvas {
+        display: none;
+        width: 480px;
+        height: 360px;
+      }
+      button {
+        padding: 10px 20px;
+        font-size: 18px;
+        margin-top: 15px;
+        cursor: pointer;
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  </head>
+  <body>
+    <h2>📸 Snap a Photo for the Couple!</h2>
+
+    <button id="startCameraBtn">🎥 Start Camera</button><br />
+    <video id="video" autoplay playsinline style="display: none"></video><br />
+    <button id="snapBtn" style="display: none">📷 Take Photo</button>
+
+    <canvas id="canvas" width="480" height="360"></canvas>
+
+    <script>
+      const supabaseClient = supabase.createClient(
+        "https://idhpscdhasbnpxnjqvuj.supabase.co",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkaHBzY2RoYXNibnB4bmpxdnVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM5MDc3MzIsImV4cCI6MjA2OTQ4MzczMn0.OUfqirT2FpGroHKf35tjvsH6K06ddNIvTCE_7TYR29Y"
+      );
+
+      const video = document.getElementById("video");
+      const canvas = document.getElementById("canvas");
+      const context = canvas.getContext("2d");
+      const startCameraBtn = document.getElementById("startCameraBtn");
+      const snapBtn = document.getElementById("snapBtn");
+
+      let stream;
+
+      startCameraBtn.addEventListener("click", async () => {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { exact: "environment" } },
+          });
+
+          video.srcObject = stream;
+          video.style.display = "block";
+          snapBtn.style.display = "inline-block";
+          startCameraBtn.style.display = "none";
+          video.play();
+        } catch (err) {
+          // fallback to default camera (usually front) if back cam fails
+          console.warn("Back camera not available, falling back.", err);
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = stream;
+            video.style.display = "block";
+            snapBtn.style.display = "inline-block";
+            startCameraBtn.style.display = "none";
+            video.play();
+          } catch (err2) {
+            alert("Camera access denied or not supported.");
+            console.error("Camera error:", err2);
+          }
+        }
+      });
+
+      snapBtn.addEventListener("click", async () => {
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        canvas.toBlob(async (blob) => {
+          const fileName = `photo-${Date.now()}.png`;
+
+          const { data, error } = await supabaseClient.storage
+            .from("engagement-photos") // make sure this bucket exists!
+            .upload(fileName, blob, {
+              contentType: "image/png",
+            });
+
+          if (error) {
+            alert("Upload failed. Check console.");
+            console.error("Upload error:", error);
+          } else {
+            alert("Photo uploaded successfully. Thank you!");
+            console.log("Upload success:", data);
+          }
+        }, "image/png");
+      });
+    </script>
+  </body>
+</html>
